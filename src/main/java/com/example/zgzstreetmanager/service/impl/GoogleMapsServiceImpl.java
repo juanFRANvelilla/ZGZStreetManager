@@ -27,6 +27,10 @@ public class GoogleMapsServiceImpl implements GoogleMapsService {
 
     @Override
     public Street getStreet(String streetName) {
+
+        if(streetName.equals("Calle Conde De Aranda")){
+            System.out.println("tamente");
+        }
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = null;
         try {
@@ -34,13 +38,14 @@ public class GoogleMapsServiceImpl implements GoogleMapsService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        streetName = streetName + ", Zaragoza";
         String apiKey = root.path("API_KEY_GOOGLE_MAPS").asText();
         String baseUrl = "https://maps.googleapis.com/maps/api/geocode/json";
-        String url = baseUrl + "?address=" + streetName + "&key=" + apiKey;
+        String url = baseUrl +
+                "?address=" + streetName +
+                "&components=locality:Zaragoza|country:ES" +
+                "&key=" + apiKey;
 
         try {
-
             //obtener json con las coordenadas
             String jsonData = restTemplate.getForObject(url, String.class);
 

@@ -1,14 +1,16 @@
 package com.example.zgzstreetmanager.service.impl;
 
 import com.example.zgzstreetmanager.model.DistrictEnum;
+import com.example.zgzstreetmanager.model.GeoJSONObject;
 import com.example.zgzstreetmanager.service.DistrictService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.awt.geom.Path2D;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,55 +18,13 @@ import java.util.Map;
 
 @Service
 public class DistrictServiceImpl implements DistrictService {
-//    private static final String ACTURJSON = "src/main/java/com/example/zgzstreetmanager/jsonData/ActurDistrictJSON";
-//    private static final String RABALJSON = "src/main/java/com/example/zgzstreetmanager/jsonData/RabalJSON";
-    private static final List<String> JSON_PATHS = List.of(
-            "src/main/java/com/example/zgzstreetmanager/jsonData/ActurDistrictJSON",
-            "src/main/java/com/example/zgzstreetmanager/jsonData/RabalJSON"
-    );
+
+    private static final String DISTRICTJSON_PATHS = "src/main/java/com/example/zgzstreetmanager/jsonData/DistrictJSON";
 
     private  static final Map<String, Path2D> DISTRICT_POLYGONS = new HashMap<>();
 
 
 
-    public static List<List<Double>> extractCoordinates(String jsonData) {
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode root;
-
-        try {
-            root = objectMapper.readTree(jsonData);
-
-            JsonNode coordinatesNode = root.path("features").path(0).path("geometry").path("coordinates").path(0);
-
-            List<List<Double>> coords = new ArrayList<>();
-            for (int i = 0; i < coordinatesNode.size(); i++) {
-                JsonNode coordinatePair = coordinatesNode.path(i);
-                List<Double> coordinate = new ArrayList<>();
-                coordinate.add(coordinatePair.path(0).asDouble());
-                coordinate.add(coordinatePair.path(1).asDouble());
-                coords.add(coordinate);
-            }
-            return coords;
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static DistrictEnum extractDistrictEnum(String jsonData){
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode root;
-
-        try {
-            root = objectMapper.readTree(jsonData);
-
-            JsonNode districtNode = root.path("features").path(0).path("name");
-            return DistrictEnum.valueOf(districtNode.asText());
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
 
     //            Path2D polygon = new Path2D.Double();
@@ -94,95 +54,104 @@ public class DistrictServiceImpl implements DistrictService {
 //            polygon.closePath();
 
 
+    public static List<GeoJSONObject.Feature> extractFeatures(String jsonData) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<GeoJSONObject.Feature> features = new ArrayList<>();
 
-    private static void defineActurReyFernando() {
+        try {
+            JsonNode root = objectMapper.readTree(jsonData);
 
-        for(String path : JSON_PATHS){
-            try {
-                String json = new String(Files.readAllBytes(Paths.get(path)));
+            JsonNode featuresList = root.path("features");
 
-                Path2D polygon = new Path2D.Double();
-                List<List<Double>> coords = extractCoordinates(json);
-                DistrictEnum districtEnum = extractDistrictEnum(json);
-
-
-                // Mover a la primera coordenada
-                polygon.moveTo(coords.get(0).get(1), coords.get(0).get(0));
-
-                // Dibujar líneas a las siguientes coordenadas
-                for (int i = 1; i < coords.size(); i++) {
-                    polygon.lineTo(coords.get(i).get(1), coords.get(i).get(0));
-                }
-                polygon.closePath();
-
-                DISTRICT_POLYGONS.put(districtEnum.toString(), polygon);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
+            features = objectMapper.convertValue(featuresList, new TypeReference<>() {});
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
+        return features;
+    }
+
+
+//    public static List<List<Double>> extractCoordinates(String jsonData) {
+//        ObjectMapper objectMapper = new ObjectMapper();
+//        JsonNode root;
+//
+//        try {
+//            root = objectMapper.readTree(jsonData);
+//
+//            JsonNode coordinatesNode = root.path("features").path(0).path("geometry").path("coordinates").path(0);
+//
+//            List<List<Double>> coords = new ArrayList<>();
+//            for (int i = 0; i < coordinatesNode.size(); i++) {
+//                JsonNode coordinatePair = coordinatesNode.path(i);
+//                List<Double> coordinate = new ArrayList<>();
+//                coordinate.add(coordinatePair.path(0).asDouble());
+//                coordinate.add(coordinatePair.path(1).asDouble());
+//                coords.add(coordinate);
+//            }
+//            return coords;
+//
+//        } catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
+//
+//    public static DistrictEnum extractDistrictEnum(String jsonData){
+//        ObjectMapper objectMapper = new ObjectMapper();
+//        JsonNode root;
+//
+//        try {
+//            root = objectMapper.readTree(jsonData);
+//
+//            JsonNode districtNode = root.path("features").path(0).path("name");
+//            return DistrictEnum.valueOf(districtNode.asText());
+//
+//        } catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
+
+    private static void createDistrictPolygon(GeoJSONObject.Feature feature) {
+        Path2D polygon = new Path2D.Double();
+        List<List<List<Double>>> coordinates = feature.getGeometry().getCoordinates();
+        List<List<Double>> coords = coordinates.get(0);
+
+        // Mover a la primera coordenada
+        polygon.moveTo(coords.get(0).get(1), coords.get(0).get(0));
+
+        // Dibujar líneas a las siguientes coordenadas
+        for (int i = 1; i < coords.size(); i++) {
+            polygon.lineTo(coords.get(i).get(1), coords.get(i).get(0));
+        }
+        polygon.closePath();
+
+        DISTRICT_POLYGONS.put(feature.getProperties().getName(), polygon);
+        System.out.println("Distrito " + feature.getProperties().getName() + " creado.");
     }
 
 
 
-//    private static void defineElRabal() {
-//        Path2D acturReyFernando = new Path2D.Double();
-//        acturReyFernando.moveTo(41.6769, -0.8947);
-//        acturReyFernando.lineTo(41.6795, -0.8860);
-//        acturReyFernando.lineTo(41.6830, -0.8702);
-//        acturReyFernando.lineTo(41.6814, -0.8638);
-//        acturReyFernando.lineTo(41.6738, -0.8701);
-//        acturReyFernando.closePath();
-//        DISTRICT_POLYGONS.put(DistrictEnum.EL_RABAL.toString(), acturReyFernando);
-//    }
-//
-//    private static void defineCentro() {
-//        Path2D centro = new Path2D.Double();
-//        centro.moveTo(41.6488, -0.8891); // Example coordinates
-//        centro.lineTo(41.6466, -0.8801);
-//        centro.lineTo(41.6433, -0.8781);
-//        centro.lineTo(41.6404, -0.8823);
-//        centro.lineTo(41.6457, -0.8886);
-//        centro.closePath();
-//        DISTRICT_POLYGONS.put("Centro", centro);
-//    }
-//
-//    private static void defineDelicias() {
-//        Path2D delicias = new Path2D.Double();
-//        delicias.moveTo(41.6554, -0.9102); // Example coordinates
-//        delicias.lineTo(41.6511, -0.9008);
-//        delicias.lineTo(41.6498, -0.8943);
-//        delicias.lineTo(41.6531, -0.8847);
-//        delicias.lineTo(41.6573, -0.8950);
-//        delicias.closePath();
-//        DISTRICT_POLYGONS.put("Delicias", delicias);
-//    }
-//
-//    private static void defineTorrero() {
-//        Path2D torrero = new Path2D.Double();
-//        torrero.moveTo(41.6284, -0.8891); // Example coordinates
-//        torrero.lineTo(41.6256, -0.8834);
-//        torrero.lineTo(41.6232, -0.8791);
-//        torrero.lineTo(41.6220, -0.8865);
-//        torrero.lineTo(41.6265, -0.8895);
-//        torrero.closePath();
-//        DISTRICT_POLYGONS.put("Torrero", torrero);
-//    }
-//
-//    private static void defineLasFuentes() {
-//        Path2D lasFuentes = new Path2D.Double();
-//        lasFuentes.moveTo(41.6532, -0.8632); // Example coordinates
-//        lasFuentes.lineTo(41.6487, -0.8600);
-//        lasFuentes.lineTo(41.6462, -0.8554);
-//        lasFuentes.lineTo(41.6473, -0.8490);
-//        lasFuentes.lineTo(41.6521, -0.8502);
-//        lasFuentes.closePath();
-//        DISTRICT_POLYGONS.put("Las Fuentes", lasFuentes);
-//    }
+    private static void defineDistricts() {
+
+        try {
+            String json = new String(Files.readAllBytes(Path.of(DISTRICTJSON_PATHS)));
+
+            //obtener las features
+            List<GeoJSONObject.Feature> featureList = extractFeatures(json);
+
+            //crear polígonos para cada distrito
+            for (GeoJSONObject.Feature feature : featureList) {
+                createDistrictPolygon(feature);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
 
     static {
-        defineActurReyFernando();
+        defineDistricts();
     }
 
     @Override
